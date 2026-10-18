@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sudoku Master</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      aspect-ratio: 1 / 1;
+      width: 100%;
+      max-width: 100%;
+      border: 3px solid #334155;
+      box-sizing: border-box;
+    }
+
+    .dark .sudoku-grid {
+      border-color: #64748b;
+    }
+
+    .cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      aspect-ratio: 1 / 1;
+      font-size: clamp(1.1rem, 4.2vw, 1.8rem);
+      font-weight: 600;
+      cursor: pointer;
+      border-right: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .dark .cell {
+      border-right: 1px solid #334155;
+      border-bottom: 1px solid #334155;
+    }
+
+    /* Subgrid thick borders */
+    .cell:nth-child(3n) {
+      border-right: 3px solid #334155;
+    }
+    .dark .cell:nth-child(3n) {
+      border-right: 3px solid #64748b;
+    }
+    .cell:nth-child(9n) {
+      border-right: none;
+    }
+
+    .row-border-thick {
+      border-bottom: 3px solid #334155 !important;
+    }
+    .dark .row-border-thick {
+      border-bottom: 3px solid #64748b !important;
+    }
+
+    /* Notes mini-grid inside cell */
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+      padding: 1px;
+      pointer-events: none;
+    }
+
+    .note-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.55rem, 1.6vw, 0.75rem);
+      line-height: 1;
+      font-weight: 500;
+      color: #64748b;
+    }
+    .dark .note-item {
+      color: #94a3b8;
+    }
+
+    /* Keyframe animations */
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      70% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .pop-cell {
+      animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-4px); }
+      40%, 80% { transform: translateX(4px); }
+    }
+
+    .cell-shake {
+      animation: shake 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+  <header class="w-full max-w-xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+        <i class="fa-solid fa-shapes text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight leading-tight">Sudoku Master</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Desafie sua mente</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-2">
+      <button id="btn-sound" title="Alternar Som" class="p-2.5 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+        <i class="fa-solid fa-volume-high text-slate-600 dark:text-slate-300"></i>
+      </button>
+      <button id="btn-theme" title="Modo Escuro/Claro" class="p-2.5 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+        <i class="fa-solid fa-moon text-slate-600 dark:text-slate-300"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-xl mx-auto px-4 flex flex-col justify-start">
+    <div class="flex items-center justify-between py-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
+      <!-- Dificuldade Dropdown -->
+      <div class="relative">
+        <select id="select-difficulty" class="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm py-1.5 pl-3 pr-8 rounded-xl shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="easy">Fácil</option>
+          <option value="medium" selected>Médio</option>
+          <option value="hard">Difícil</option>
+          <option value="expert">Especialista</option>
+        </select>
+        <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs pointer-events-none text-slate-400"></i>
+      </div>
+
+      <!-- Erros e Cronômetro -->
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-200 dark:border-rose-900/50">
+          <i class="fa-solid fa-circle-exclamation text-xs"></i>
+          <span>Erros: <span id="mistakes-counter">0/3</span></span>
+        </div>
+        <div class="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+          <i class="fa-regular fa-clock text-xs"></i>
+          <span id="timer-display">00:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="w-full relative my-2">
+      <div id="sudoku-board" class="sudoku-grid rounded-2xl overflow-hidden shadow-xl bg-white dark:bg-slate-900 select-none">
+        <!-- Cells generated via JavaScript -->
+      </div>
+      
+      <!-- Pause / Win Overlay -->
+      <div id="game-overlay" class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 hidden z-20">
+        <div id="overlay-content" class="text-center text-white space-y-4">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-4 gap-2 my-2">
+      <button id="btn-undo" class="flex flex-col items-center justify-center py-2.5 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700/80 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition">
+        <i class="fa-solid fa-rotate-left text-slate-600 dark:text-slate-300 text-lg mb-0.5"></i>
+        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Desfazer</span>
+      </button>
+
+      <button id="btn-erase" class="flex flex-col items-center justify-center py-2.5 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700/80 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition">
+        <i class="fa-solid fa-eraser text-slate-600 dark:text-slate-300 text-lg mb-0.5"></i>
+        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Apagar</span>
+      </button>
+
+      <button id="btn-notes" class="flex flex-col items-center justify-center py-2.5 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700/80 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition relative">
+        <span id="notes-badge" class="absolute top-1.5 right-3 text-[9px] uppercase px-1.5 py-0.2 rounded-full font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">OFF</span>
+        <i class="fa-solid fa-pencil text-slate-600 dark:text-slate-300 text-lg mb-0.5"></i>
+        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Anotar</span>
+      </button>
+
+      <button id="btn-hint" class="flex flex-col items-center justify-center py-2.5 bg-white dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700/80 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition relative">
+        <span id="hints-count" class="absolute top-1.5 right-3 text-[10px] font-bold bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">3</span>
+        <i class="fa-regular fa-lightbulb text-amber-500 text-lg mb-0.5"></i>
+        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Dica</span>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-9 gap-1 sm:gap-2 my-2">
+      <!-- Keypad buttons 1 to 9 -->
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="1">1</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="2">2</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="3">3</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="4">4</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="5">5</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="6">6</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="7">7</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="8">8</button>
+      <button class="num-btn h-12 sm:h-14 rounded-xl bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/40 text-brand-600 dark:text-indigo-400 font-bold text-lg sm:text-2xl shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition flex items-center justify-center" data-val="9">9</button>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 my-2">
+      <button id="btn-restart" class="flex-1 py-3 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-sm transition flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-arrow-rotate-right text-xs"></i>
+        <span>Reiniciar</span>
+      </button>
+
+      <button id="btn-new-game" class="flex-1 py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md shadow-brand-500/25 active:scale-98 transition flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-play text-xs"></i>
+        <span>Novo Jogo</span>
+      </button>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-4 py-2.5 rounded-full text-xs font-semibold shadow-xl border border-slate-700 pointer-events-none opacity-0 transition-opacity duration-300 flex items-center space-x-2 z-50">
+      <i id="toast-icon" class="fa-solid fa-info-circle text-brand-400"></i>
+      <span id="toast-message">Mensagem</span>
+    </div>
+  </main>
+
+  <footer class="py-3 text-center text-xs text-slate-400 dark:text-slate-600">
+    Atalhos: Teclas 1-9 para preencher | Backspace / Delete para apagar | N para Anotações
+  </footer>
+
+  <script>
+    const audioState = {
+      enabled: true,
+      synth: null,
+      initialized: false,
+      init() {
+        if (this.initialized) return;
+        try {
+          if (typeof Tone !== 'undefined') {
+            this.synth = new Tone.PolySynth(Tone.Synth, {
+              oscillator: { type: "triangle" },
+              envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.1 }
+            }).toDestination();
+            this.synth.volume.value = -12;
+            this.initialized = true;
+          }
+        } catch(e) {
+          console.warn("Safari AudioContext inicializado em fallback", e);
+        }
+      },
+      ensureAudioContext() {
+        if (!this.initialized) {
+          this.init();
+        }
+        if (typeof Tone !== 'undefined' && Tone.context && Tone.context.state !== 'running') {
+          Tone.start().catch(() => {});
+        }
+      },
+      playClick() {
+        if (!this.enabled) return;
+        this.ensureAudioContext();
+        if (!this.synth) return;
+        try {
+          this.synth.triggerAttackRelease("C6", "32n");
+        } catch(e) {}
+      },
+      playNumber() {
+        if (!this.enabled) return;
+        this.ensureAudioContext();
+        if (!this.synth) return;
+        try {
+          this.synth.triggerAttackRelease("E5", "16n");
+        } catch(e) {}
+      },
+      playError() {
+        if (!this.enabled) return;
+        this.ensureAudioContext();
+        if (!this.synth) return;
+        try {
+          this.synth.triggerAttackRelease("C3", "16n");
+        } catch(e) {}
+      },
+      playWin() {
+        if (!this.enabled) return;
+        this.ensureAudioContext();
+        if (!this.synth) return;
+        try {
+          const now = Tone.now();
+          this.synth.triggerAttackRelease("C5", "8n", now);
+          this.synth.triggerAttackRelease("E5", "8n", now + 0.12);
+          this.synth.triggerAttackRelease("G5", "8n", now + 0.24);
+          this.synth.triggerAttackRelease("C6", "4n", now + 0.36);
+        } catch(e) {}
+      }
+    };
+
+    class SudokuEngine {
+      static isValid(board, row, col, num) {
+        for (let i = 0; i < 9; i++) {
+          if (board[row][i] === num && i !== col) return false;
+          if (board[i][col] === num && i !== row) return false;
+        }
+        const startRow = Math.floor(row / 3) * 3;
+        const startCol = Math.floor(col / 3) * 3;
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            const checkR = startRow + r;
+            const checkC = startCol + c;
+            if (board[checkR][checkC] === num && (checkR !== row || checkC !== col)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      static solve(board) {
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (board[r][c] === 0) {
+              const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+              for (const num of numbers) {
+                if (this.isValid(board, r, c, num)) {
+                  board[r][c] = num;
+                  if (this.solve(board)) return true;
+                  board[r][c] = 0;
+                }
+              }
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      static countSolutions(board, count = { val: 0 }) {
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (board[r][c] === 0) {
+              for (let num = 1; num <= 9; num++) {
+                if (this.isValid(board, r, c, num)) {
+                  board[r][c] = num;
+                  this.countSolutions(board, count);
+                  board[r][c] = 0;
+                  if (count.val >= 2) return;
+                }
+              }
+              return;
+            }
+          }
+        }
+        count.val++;
+      }
+
+      static generate(difficulty = 'medium') {
+        const solution = Array(9).fill(0).map(() => Array(9).fill(0));
+        this.solve(solution);
+
+        const puzzle = solution.map(row => [...row]);
+        let attempts;
+        switch (difficulty) {
+          case 'easy': attempts = 32; break;
+          case 'medium': attempts = 44; break;
+          case 'hard': attempts = 52; break;
+          case 'expert': attempts = 58; break;
+          default: attempts = 44;
+        }
+
+        const positions = [];
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) positions.push([r, c]);
+        }
+        positions.sort(() => Math.random() - 0.5);
+
+        let removed = 0;
+        for (const [r, c] of positions) {
+          if (removed >= attempts) break;
+          const temp = puzzle[r][c];
+          puzzle[r][c] = 0;
+
+          // Check for unique solution
+          const copy = puzzle.map(row => [...row]);
+          const count = { val: 0 };
+          this.countSolutions(copy, count);
+
+          if (count.val !== 1) {
+            puzzle[r][c] = temp; // Revert if ambiguous
+          } else {
+            removed++;
+          }
+        }
+
+        return { puzzle, solution };
+      }
+    }
+
+    const state = {
+      difficulty: 'medium',
+      initialGrid: [],
+      currentGrid: [],
+      solutionGrid: [],
+      notesGrid: Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set())),
+      selectedCell: null, // { r, c }
+      notesMode: false,
+      mistakes: 0,
+      maxMistakes: 3,
+      hintsRemaining: 3,
+      timerSeconds: 0,
+      timerInterval: null,
+      history: [],
+      isGameOver: false,
+      isPaused: false
+    };
+
+    const boardEl = document.getElementById('sudoku-board');
+    const timerDisplayEl = document.getElementById('timer-display');
+    const mistakesEl = document.getElementById('mistakes-counter');
+    const hintsCountEl = document.getElementById('hints-count');
+    const notesBadge = document.getElementById('notes-badge');
+    const selectDifficulty = document.getElementById('select-difficulty');
+    const gameOverlay = document.getElementById('game-overlay');
+    const overlayContent = document.getElementById('overlay-content');
+    const toastEl = document.getElementById('toast');
+    const toastMsgEl = document.getElementById('toast-message');
+
+    let toastTimeout;
+    function showToast(message, icon = 'fa-info-circle') {
+      clearTimeout(toastTimeout);
+      toastMsgEl.textContent = message;
+      const iconEl = document.getElementById('toast-icon');
+      iconEl.className = `fa-solid ${icon} text-brand-400`;
+      toastEl.classList.remove('opacity-0');
+      toastTimeout = setTimeout(() => {
+        toastEl.classList.add('opacity-0');
+      }, 2400);
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+      clearInterval(state.timerInterval);
+      state.timerSeconds = 0;
+      timerDisplayEl.textContent = '00:00';
+      state.timerInterval = setInterval(() => {
+        if (!state.isGameOver && !state.isPaused) {
+          state.timerSeconds++;
+          timerDisplayEl.textContent = formatTime(state.timerSeconds);
+        }
+      }, 1000);
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.setAttribute('role', 'button');
+          cell.setAttribute('tabindex', '0');
+
+          if (r === 2 || r === 5) {
+            cell.classList.add('row-border-thick');
+          }
+
+          // Safari touch & click support
+          cell.addEventListener('click', (e) => {
+            e.preventDefault();
+            selectCell(r, c);
+          });
+          
+          boardEl.appendChild(cell);
+        }
+      }
+      updateBoardVisuals();
+    }
+
+    function updateBoardVisuals() {
+      const cells = boardEl.children;
+      const sel = state.selectedCell;
+      const selectedVal = sel ? state.currentGrid[sel.r][sel.c] : null;
+
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const r = parseInt(cell.dataset.row);
+        const c = parseInt(cell.dataset.col);
+        const val = state.currentGrid[r][c];
+        const isInitial = state.initialGrid[r][c] !== 0;
+
+        // Reset classes
+        cell.className = 'cell';
+        if (r === 2 || r === 5) cell.classList.add('row-border-thick');
+
+        // Text & Background Styling
+        const isSelected = sel && sel.r === r && sel.c === c;
+        const isSameNumber = val !== 0 && selectedVal !== 0 && val === selectedVal;
+        const isInFocusGroup = sel && (sel.r === r || sel.c === c || (Math.floor(sel.r/3) === Math.floor(r/3) && Math.floor(sel.c/3) === Math.floor(c/3)));
+
+        if (isSelected) {
+          cell.classList.add('bg-brand-500', 'text-white', 'dark:bg-brand-600');
+        } else if (isSameNumber) {
+          cell.classList.add('bg-brand-100', 'dark:bg-indigo-950/60');
+        } else if (isInFocusGroup) {
+          cell.classList.add('bg-slate-100', 'dark:bg-slate-800/60');
+        } else {
+          cell.classList.add('bg-white', 'dark:bg-slate-900');
+        }
+
+        // Value or notes
+        if (val !== 0) {
+          cell.innerHTML = `<span>${val}</span>`;
+          if (isInitial) {
+            if (!isSelected) cell.classList.add('text-slate-900', 'dark:text-slate-100', 'font-black');
+          } else {
+            // User entered
+            const isError = val !== state.solutionGrid[r][c];
+            if (isError) {
+              cell.classList.add('text-rose-500', 'dark:text-rose-400');
+            } else if (!isSelected) {
+              cell.classList.add('text-brand-600', 'dark:text-indigo-400');
+            }
+          }
+        } else {
+          // Render pencil notes
+          const notes = state.notesGrid[r][c];
+          if (notes && notes.size > 0) {
+            let notesHtml = '<div class="notes-grid">';
+            for (let n = 1; n <= 9; n++) {
+              notesHtml += `<span class="note-item">${notes.has(n) ? n : ''}</span>`;
+            }
+            notesHtml += '</div>';
+            cell.innerHTML = notesHtml;
+          } else {
+            cell.innerHTML = '';
+          }
+        }
+      }
+    }
+
+    function selectCell(r, c) {
+      if (state.isGameOver) return;
+      audioState.playClick();
+      state.selectedCell = { r, c };
+      updateBoardVisuals();
+    }
+
+    function inputNumber(num) {
+      if (state.isGameOver || !state.selectedCell) return;
+      const { r, c } = state.selectedCell;
+
+      // Immutable starting clue check
+      if (state.initialGrid[r][c] !== 0) {
+        showToast("Você não pode alterar os números iniciais!", "fa-lock");
+        return;
+      }
+
+      if (state.notesMode) {
+        // Toggle note
+        const notes = state.notesGrid[r][c];
+        if (notes.has(num)) {
+          notes.delete(num);
+        } else {
+          notes.add(num);
+        }
+        audioState.playClick();
+        updateBoardVisuals();
+        return;
+      }
+
+      // Play normal move
+      const prevVal = state.currentGrid[r][c];
+      if (prevVal === num) return; // already set
+
+      // Save History for Undo
+      state.history.push({
+        r,
+        c,
+        prevVal,
+        prevNotes: new Set(state.notesGrid[r][c])
+      });
+
+      // Clear cell's notes and update value
+      state.notesGrid[r][c].clear();
+      state.currentGrid[r][c] = num;
+
+      const cellEl = boardEl.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+      cellEl.classList.add('pop-cell');
+      setTimeout(() => cellEl.classList.remove('pop-cell'), 250);
+
+      // Verify correctness
+      if (num !== state.solutionGrid[r][c]) {
+        state.mistakes++;
+        mistakesEl.textContent = `${state.mistakes}/${state.maxMistakes}`;
+        audioState.playError();
+        cellEl.classList.add('cell-shake');
+        setTimeout(() => cellEl.classList.remove('cell-shake'), 350);
+
+        if (state.mistakes >= state.maxMistakes) {
+          triggerGameOver(false);
+          return;
+        }
+      } else {
+        audioState.playNumber();
+        // Remove this candidate note from same row, col, and subgrid
+        removeNoteCandidate(r, c, num);
+        checkWinCondition();
+      }
+
+      updateBoardVisuals();
+    }
+
+    function removeNoteCandidate(r, c, num) {
+      for (let i = 0; i < 9; i++) {
+        state.notesGrid[r][i].delete(num);
+        state.notesGrid[i][c].delete(num);
+      }
+      const startR = Math.floor(r / 3) * 3;
+      const startC = Math.floor(c / 3) * 3;
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          state.notesGrid[startR + row][startC + col].delete(num);
+        }
+      }
+    }
+
+    function eraseCell() {
+      if (state.isGameOver || !state.selectedCell) return;
+      const { r, c } = state.selectedCell;
+      if (state.initialGrid[r][c] !== 0) return;
+
+      const prevVal = state.currentGrid[r][c];
+      const prevNotes = new Set(state.notesGrid[r][c]);
+
+      if (prevVal === 0 && prevNotes.size === 0) return;
+
+      state.history.push({ r, c, prevVal, prevNotes });
+      state.currentGrid[r][c] = 0;
+      state.notesGrid[r][c].clear();
+      audioState.playClick();
+      updateBoardVisuals();
+    }
+
+    function undoMove() {
+      if (state.isGameOver || state.history.length === 0) return;
+      const lastMove = state.history.pop();
+      state.currentGrid[lastMove.r][lastMove.c] = lastMove.prevVal;
+      state.notesGrid[lastMove.r][lastMove.c] = new Set(lastMove.prevNotes);
+      state.selectedCell = { r: lastMove.r, c: lastMove.c };
+      audioState.playClick();
+      updateBoardVisuals();
+      showToast("Jogada desfeita", "fa-rotate-left");
+    }
+
+    function giveHint() {
+      if (state.isGameOver) return;
+      if (state.hintsRemaining <= 0) {
+        showToast("Sem dicas restantes para esta partida!", "fa-lightbulb");
+        return;
+      }
+
+      let targetR = -1;
+      let targetC = -1;
+
+      // Prefer currently selected cell if empty or wrong
+      if (state.selectedCell) {
+        const { r, c } = state.selectedCell;
+        if (state.initialGrid[r][c] === 0 && state.currentGrid[r][c] !== state.solutionGrid[r][c]) {
+          targetR = r;
+          targetC = c;
+        }
+      }
+
+      // If not selected, find first empty cell
+      if (targetR === -1) {
+        const candidates = [];
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (state.currentGrid[r][c] === 0) candidates.push({ r, c });
+          }
+        }
+        if (candidates.length > 0) {
+          const rand = candidates[Math.floor(Math.random() * candidates.length)];
+          targetR = rand.r;
+          targetC = rand.c;
+        }
+      }
+
+      if (targetR !== -1) {
+        state.hintsRemaining--;
+        hintsCountEl.textContent = state.hintsRemaining;
+        const correctVal = state.solutionGrid[targetR][targetC];
+        state.currentGrid[targetR][targetC] = correctVal;
+        state.notesGrid[targetR][targetC].clear();
+        state.selectedCell = { r: targetR, c: targetC };
+        removeNoteCandidate(targetR, targetC, correctVal);
+        audioState.playNumber();
+        updateBoardVisuals();
+        showToast(`Dica revelada: ${correctVal}!`, "fa-wand-magic-sparkles");
+        checkWinCondition();
+      }
+    }
+
+    function checkWinCondition() {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (state.currentGrid[r][c] !== state.solutionGrid[r][c]) {
+            return false;
+          }
+        }
+      }
+      triggerGameOver(true);
+      return true;
+    }
+
+    function triggerGameOver(isWin) {
+      state.isGameOver = true;
+      clearInterval(state.timerInterval);
+
+      gameOverlay.classList.remove('hidden');
+
+      if (isWin) {
+        audioState.playWin();
+        overlayContent.innerHTML = `
+          <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <h2 class="text-2xl font-black">Parabéns! Você Venceu!</h2>
+          <p class="text-sm text-slate-300">Tempo total: <span class="font-bold text-white">${formatTime(state.timerSeconds)}</span></p>
+          <p class="text-xs text-slate-400">Erros cometidos: ${state.mistakes}/3</p>
+          <button onclick="newGame()" class="w-full mt-4 py-3 px-6 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg transition">
+            Jogar Novamente
+          </button>
+        `;
+      } else {
+        overlayContent.innerHTML = `
+          <div class="w-16 h-16 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl">
+            <i class="fa-solid fa-skull"></i>
+          </div>
+          <h2 class="text-2xl font-black">Fim de Jogo</h2>
+          <p class="text-sm text-slate-300">Você atingiu o limite de 3 erros.</p>
+          <div class="flex space-x-2 pt-2">
+            <button onclick="restartCurrentGame()" class="flex-1 py-2.5 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition text-xs">
+              Tentar Novamente
+            </button>
+            <button onclick="newGame()" class="flex-1 py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition text-xs">
+              Novo Jogo
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function newGame() {
+      gameOverlay.classList.add('hidden');
+      state.isGameOver = false;
+      state.mistakes = 0;
+      state.hintsRemaining = 3;
+      state.history = [];
+      state.selectedCell = null;
+      mistakesEl.textContent = `0/${state.maxMistakes}`;
+      hintsCountEl.textContent = state.hintsRemaining;
+
+      const generated = SudokuEngine.generate(state.difficulty);
+      state.initialGrid = generated.puzzle.map(r => [...r]);
+      state.currentGrid = generated.puzzle.map(r => [...r]);
+      state.solutionGrid = generated.solution.map(r => [...r]);
+      state.notesGrid = Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
+
+      renderBoard();
+      startTimer();
+      showToast(`Partida iniciada no modo ${selectDifficulty.options[selectDifficulty.selectedIndex].text}`);
+    }
+
+    function restartCurrentGame() {
+      gameOverlay.classList.add('hidden');
+      state.isGameOver = false;
+      state.mistakes = 0;
+      state.history = [];
+      state.selectedCell = null;
+      mistakesEl.textContent = `0/${state.maxMistakes}`;
+      state.currentGrid = state.initialGrid.map(r => [...r]);
+      state.notesGrid = Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
+      renderBoard();
+      startTimer();
+      showToast("Jogo reiniciado", "fa-arrow-rotate-right");
+    }
+
+    // Keypad numbers
+    document.querySelectorAll('.num-btn').forEach(btn => {
+      const handleInput = (e) => {
+        e.preventDefault();
+        const val = parseInt(btn.dataset.val);
+        inputNumber(val);
+      };
+      btn.addEventListener('click', handleInput);
+    });
+
+    // Unlock Web Audio on first user interaction for Safari/WebKit
+    const unlockAudio = () => {
+      audioState.ensureAudioContext();
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('click', unlockAudio);
+    };
+    window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+    window.addEventListener('click', unlockAudio, { once: true });
+
+    // Notes Mode Toggle
+    const notesBtn = document.getElementById('btn-notes');
+    notesBtn.addEventListener('click', () => {
+      state.notesMode = !state.notesMode;
+      audioState.playClick();
+      if (state.notesMode) {
+        notesBadge.textContent = 'ON';
+        notesBadge.classList.replace('bg-slate-200', 'bg-brand-500');
+        notesBadge.classList.replace('text-slate-600', 'text-white');
+        notesBadge.classList.replace('dark:bg-slate-700', 'dark:bg-brand-500');
+        notesBtn.classList.add('ring-2', 'ring-brand-500');
+        showToast("Modo de Anotações ativado", "fa-pencil");
+      } else {
+        notesBadge.textContent = 'OFF';
+        notesBadge.classList.replace('bg-brand-500', 'bg-slate-200');
+        notesBadge.classList.replace('text-white', 'text-slate-600');
+        notesBadge.classList.replace('dark:bg-brand-500', 'dark:bg-slate-700');
+        notesBtn.classList.remove('ring-2', 'ring-brand-500');
+        showToast("Modo de Anotações desativado", "fa-pencil");
+      }
+    });
+
+    // Tools
+    document.getElementById('btn-undo').addEventListener('click', undoMove);
+    document.getElementById('btn-erase').addEventListener('click', eraseCell);
+    document.getElementById('btn-hint').addEventListener('click', giveHint);
+    document.getElementById('btn-restart').addEventListener('click', restartCurrentGame);
+    document.getElementById('btn-new-game').addEventListener('click', newGame);
+
+    selectDifficulty.addEventListener('change', (e) => {
+      state.difficulty = e.target.value;
+      newGame();
+    });
+
+    // Sound Toggle
+    const soundBtn = document.getElementById('btn-sound');
+    soundBtn.addEventListener('click', () => {
+      audioState.enabled = !audioState.enabled;
+      if (audioState.enabled) {
+        soundBtn.innerHTML = '<i class="fa-solid fa-volume-high text-slate-600 dark:text-slate-300"></i>';
+        showToast("Som ativado", "fa-volume-high");
+      } else {
+        soundBtn.innerHTML = '<i class="fa-solid fa-volume-xmark text-slate-400"></i>';
+        showToast("Som desativado", "fa-volume-xmark");
+      }
+    });
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('btn-theme');
+    function applyTheme(isDark) {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        themeBtn.innerHTML = '<i class="fa-solid fa-sun text-amber-400"></i>';
+      } else {
+        document.documentElement.classList.remove('dark');
+        themeBtn.innerHTML = '<i class="fa-solid fa-moon text-slate-600"></i>';
+      }
+      updateBoardVisuals();
+    }
+
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(prefersDark);
+
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      applyTheme(!isDark);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (state.isGameOver) return;
+
+      // Numbers 1 to 9
+      if (e.key >= '1' && e.key <= '9') {
+        inputNumber(parseInt(e.key));
+        return;
+      }
+
+      // Erase
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        eraseCell();
+        return;
+      }
+
+      // Toggle Notes
+      if (e.key.toLowerCase() === 'n') {
+        notesBtn.click();
+        return;
+      }
+
+      // Arrow navigation
+      if (state.selectedCell) {
+        let { r, c } = state.selectedCell;
+        if (e.key === 'ArrowUp' && r > 0) r--;
+        else if (e.key === 'ArrowDown' && r < 8) r++;
+        else if (e.key === 'ArrowLeft' && c > 0) c--;
+        else if (e.key === 'ArrowRight' && c < 8) c++;
+        else return;
+
+        e.preventDefault();
+        selectCell(r, c);
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      newGame();
+    });
+  </script>
+</body>
+</html>
